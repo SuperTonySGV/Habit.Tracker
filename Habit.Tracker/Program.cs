@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Reflection.PortableExecutable;
+using System.Xml.Linq;
 using Microsoft.Data.Sqlite;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -9,7 +11,7 @@ namespace HabitTracker
 {
     class Program
     {
-        static string connectionString = @"Data Source=habit-Tracker.db";
+        static string connectionString = @"Data Source=habit-Tracker-2.db";
 
         static void Main(string[] args)
         {
@@ -18,12 +20,21 @@ namespace HabitTracker
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
 
-                tableCmd.CommandText = 
-                    @"CREATE TABLE IF NOT EXISTS drinking_water (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Date TEXT,
-                        Quantity INTEGER
-                        )";
+                //tableCmd.CommandText =
+                //    @"CREATE TABLE IF NOT EXISTS habit (
+                //        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                //        Name TEXT,
+                //        Date TEXT,
+                //        UOM TEXT,
+                //        Quantity INTEGER
+                //        )";
+
+                tableCmd.CommandText +=
+                    @"INSERT INTO 'habit' ('name', 'date', 'uom', 'quantity') VALUES
+                      ('Water', '01-01-20','Ounces', '60'),
+                      ('Meditating', '01-01-21','Minutes', '30'),
+                      ('Healthy meals', '01-01-22','Count', '3'),
+                      ('Reading', '01-01-23','Pages', '22')";
 
                 tableCmd.ExecuteNonQuery();
 
@@ -76,51 +87,27 @@ namespace HabitTracker
             }
         }
 
-        internal static void Update()
-        {
-            //Console.Clear();
-            GetAllRecords();
-
-            var recordId = GetNumberInput("\n\nPlease type Id of the record you would like to update. Type 0 to return to the main menu. \n\n");
-
-            using (var connection = new SqliteConnection(connectionString))
-            {
-                connection.Open();
-
-                var checkCmd = connection.CreateCommand();
-                checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM drinking_water WHERE Id = {recordId})";
-                int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
-
-                if (checkQuery == 0) {
-                    Console.WriteLine($"\n\nRecord with Id {recordId} doesn't exist. \n\n");
-                    connection.Close();
-                    Update();
-                }
-
-                string date = GetDateInput();
-
-                int quantity = GetNumberInput("\n\nPlease insert number of glasses or other measure of your choice (no decimals allowed)\n\n");
-
-                var tableCmd = connection.CreateCommand();
-                tableCmd.CommandText = $"UPDATE drinking_water SET date = '{date}', quantity = {quantity} WHERE Id = {recordId}";
-
-                tableCmd.ExecuteNonQuery();
-
-                connection.Close();
-            }
-        }
-
         private static void GetAllRecords()
         {
-            //Console.Clear();
+            var choice = GetNumberInput("\n\nType 1 for all records, else any other input returns walking. Type 0 to return to the main menu. \n\n");
+
             using (var connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
-                tableCmd.CommandText =
-                    $"SELECT * FROM drinking_water";
 
-                List<DrinkingWater> tableData = new();
+                if (choice == 1)
+                {
+                    tableCmd.CommandText =
+                        $"SELECT * FROM habit";
+                } else 
+                {
+                    tableCmd.CommandText =
+                        $"SELECT * FROM habit WHERE Name = 'Walking'";
+                }
+
+
+                List<Habit> tableData = new();
 
                 SqliteDataReader reader = tableCmd.ExecuteReader();
 
@@ -128,11 +115,13 @@ namespace HabitTracker
                 {
                     while (reader.Read())
                     {
-                        tableData.Add(new DrinkingWater()
+                        tableData.Add(new Habit()
                         {
                             Id = reader.GetInt32(0),
-                            Date = DateTime.ParseExact(reader.GetString(1), "dd-MM-yy", new CultureInfo("en-US")),
-                            Quantity = reader.GetInt32(2),
+                            Name = reader.GetString(1),
+                            Date = DateTime.ParseExact(reader.GetString(2), "dd-MM-yy", new CultureInfo("en-US")),
+                            UnitOfMeasurement = reader.GetString(3),
+                            Quantity = reader.GetInt32(4)
                         });
                     }
                 } else
@@ -145,31 +134,69 @@ namespace HabitTracker
                 Console.WriteLine("--------------------------\n");
                 foreach (var dw in tableData)
                 {
-                    Console.WriteLine($"{dw.Id} - {dw.Date.ToString("dd-MMM-yyyy")} - Quantity: {dw.Quantity}");
+                    Console.WriteLine($"({dw.Id} - {dw.Date.ToString("dd-MMM-yyyy")}) - {dw.Name} - Unit of measurement: {dw.UnitOfMeasurement} - Quantity: {dw.Quantity}");
                 }
                 Console.WriteLine("--------------------------\n");
             }
         }
-
         private static void Insert()
         {
+            string name = GetHabitName();
+
             string date = GetDateInput();
 
-            int quantity = GetNumberInput("\n\nPlease insert number of glasses or other measure of your choice (no decimals allowed)\n\n");
+            string unitOfMeasurement = GetUnitOfMeasurementInput();
+
+            int quantity = GetNumberInput("\n\nHow many times did you complete this habit today? (no decimals allowed)\n\n");
 
             using (var connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
                 tableCmd.CommandText =
-                    $"INSERT INTO drinking_water(date, quantity) VALUES('{date}', {quantity})";
+                    $"INSERT INTO habit(name, date, uom, quantity) VALUES('{name}', '{date}', '{unitOfMeasurement}',{quantity})";
 
                 tableCmd.ExecuteNonQuery();
 
                 connection.Close();
             }
         }
+        internal static void Update()
+        {
+            GetAllRecords();
 
+            var recordId = GetNumberInput("\n\nPlease type Id of the record you would like to update. Type 0 to return to the main menu. \n\n");
+
+            using (var connection = new SqliteConnection(connectionString))
+            {
+                connection.Open();
+
+                var checkCmd = connection.CreateCommand();
+                checkCmd.CommandText = $"SELECT EXISTS(SELECT 1 FROM habit WHERE Id = {recordId})";
+                int checkQuery = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                if (checkQuery == 0) {
+                    Console.WriteLine($"\n\nRecord with Id {recordId} doesn't exist. \n\n");
+                    connection.Close();
+                    Update();
+                }
+
+                string name = GetHabitName();
+
+                string date = GetDateInput();
+
+                string unitOfMeasurement = GetUnitOfMeasurementInput();
+
+                int quantity = GetNumberInput("\n\nHow many times did you complete this habit today? (no decimals allowed)\n\n");
+
+                var tableCmd = connection.CreateCommand();
+                tableCmd.CommandText = $"UPDATE habit SET name = '{name}', date = '{date}', uom = '{unitOfMeasurement}', quantity = {quantity} WHERE Id = {recordId}";
+
+                tableCmd.ExecuteNonQuery();
+
+                connection.Close();
+            }
+        }
         private static void Delete()
         {
             Console.Clear();
@@ -182,7 +209,7 @@ namespace HabitTracker
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
                 tableCmd.CommandText =
-                    $"DELETE from drinking_water WHERE Id = '{recordId}'";
+                    $"DELETE from habit WHERE Id = '{recordId}'";
 
                 int rowCount = tableCmd.ExecuteNonQuery();
 
@@ -196,6 +223,22 @@ namespace HabitTracker
             Console.WriteLine($"\n\nRecord with Id {recordId} was deleted. \n\n");
 
             GetUserInput();
+        }
+
+        internal static string GetHabitName()
+        {
+            Console.WriteLine("What is the name of your habit?");
+
+            string name = Console.ReadLine();
+            if (name == "0") GetUserInput();
+
+            while (name == null)
+            {
+                Console.WriteLine("Please give your habit a name.");
+                name = Console.ReadLine();
+            }
+
+            return name;
         }
 
         internal static string GetDateInput()
@@ -233,6 +276,22 @@ namespace HabitTracker
 
             return finalInput;
         }
+
+        internal static string GetUnitOfMeasurementInput()
+        {
+            Console.WriteLine("What is the unit of measurement for this habit? Ex. glasses of water, number of miles, minutes of meditation.");
+
+            string unitOfMeasurementInput = Console.ReadLine();
+            if (unitOfMeasurementInput == "0") GetUserInput();
+
+            while (unitOfMeasurementInput == null)
+            {
+                Console.WriteLine("Please give your habit a name.");
+                unitOfMeasurementInput = Console.ReadLine();
+            }
+
+            return unitOfMeasurementInput;
+        }
     }
 
     public class DrinkingWater
@@ -240,5 +299,13 @@ namespace HabitTracker
         public int Id { get; set; }
         public DateTime Date { get; set; }
         public int Quantity { get; set; }
+    }
+    public class Habit
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public DateTime Date { get; set; }
+        public int Quantity { get; set; }
+        public string UnitOfMeasurement {  get; set; }
     }
 }
