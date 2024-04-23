@@ -89,22 +89,29 @@ namespace HabitTracker
 
         private static void GetAllRecords()
         {
-            var choice = GetNumberInput("\n\nType 1 for all records, else any other input returns walking. Type 0 to return to the main menu. \n\n");
+            //var choice = GetNumberInput("\n\nType 1 for all records or 2 for a more advanced search. Type 0 to return to the main menu. \n\n");
 
             using (var connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
                 var tableCmd = connection.CreateCommand();
 
-                if (choice == 1)
-                {
-                    tableCmd.CommandText =
-                        $"SELECT * FROM habit";
-                } else 
-                {
-                    tableCmd.CommandText =
-                        $"SELECT * FROM habit WHERE Name = 'Walking'";
-                }
+                tableCmd.CommandText =
+                    $"SELECT * FROM habit";
+
+                //if (choice == 1)
+                //{
+                //    tableCmd.CommandText =
+                //        $"SELECT * FROM habit";
+                //} else if (choice == 2)
+                //{
+                //    Console.WriteLine("\n\nWhat is the name of the column? Choose from Name, Date, UOM, or Quantity");
+                //    var columnName = Console.ReadLine();
+                //    Console.WriteLine("\n\nWhat is the value of the column?");
+                //    var columnValue = Console.ReadLine();
+                //    tableCmd.CommandText =
+                //        $"SELECT * FROM habit WHERE Name = '{columnName}'";
+                //}
 
 
                 List<Habit> tableData = new();
